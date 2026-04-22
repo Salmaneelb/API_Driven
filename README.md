@@ -81,3 +81,70 @@ Cet atelier, **noté sur 20 points**, est évalué sur la base du barème suivan
 - Degré d'automatisation du projet (utilisation de Makefile ? script ? ...) (4 points)
 - Qualité du Readme (lisibilité, erreur, ...) (4 points)
 - Processus travail (quantité de commits, cohérence globale, interventions externes, ...) (4 points) 
+
+
+
+
+READ.ME SALMANE
+
+# API-Driven Infrastructure
+
+## C'est quoi ?
+
+Une requête HTTP qui permet de démarrer, stopper ou vérifier l'état d'une instance EC2, le tout simulé avec LocalStack dans GitHub Codespaces.
+
+---
+
+## Installation
+# Installer LocalStack
+pip install localstack
+localstack start -d
+
+# Installer le CLI AWS
+pip install awscli awscli-local --break-system-packages
+export PATH=$PATH:/usr/local/python/3.12.1/bin
+
+
+---
+
+## Déploiement
+# 1. Créer l'instance EC2
+awslocal ec2 run-instances --image-id ami-07b643b5e45e --count 1 --instance-type t2.micro --region us-east-1
+
+# 2. Déployer la Lambda
+cd lambda && zip fonction.zip fonction.py && cd ..
+awslocal lambda create-function \
+  --function-name gestion-ec2 \
+  --runtime python3.12 \
+  --handler fonction.handler \
+  --zip-file fileb://lambda/fonction.zip \
+  --role arn:aws:iam::000000000000:role/lambda-role \
+  --region us-east-1
+
+# 3. Créer et déployer l'API Gateway
+awslocal apigateway create-rest-api --name "api-ec2" --region us-east-1
+# Puis configurer les ressources, méthodes et intégration Lambda
+awslocal apigateway create-deployment --rest-api-id gg2bhmp6qe --stage-name prod --region us-east-1
+
+---
+
+## Utilisation
+
+# Statut
+curl "http://localhost:4566/restapis/gg2bhmp6qe/prod/_user_request_/ec2?action=status"
+
+# Démarrer
+curl "http://localhost:4566/restapis/gg2bhmp6qe/prod/_user_request_/ec2?action=start"
+
+# Stopper
+curl "http://localhost:4566/restapis/gg2bhmp6qe/prod/_user_request_/ec2?action=stop"
+
+
+---
+
+## Problèmes rencontrés
+
+- `awslocal` introuvable → ajout manuel du PATH Python
+- AMI invalide → utilisation d'une AMI listée via `describe-images`
+- Lambda timeout → `localhost` inaccessible depuis le conteneur, remplacé par l'IP Docker de LocalStack `172.17.0.2`
+
